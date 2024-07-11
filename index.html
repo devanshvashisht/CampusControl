@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campus Control</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    
+    .navbar-custom {
+      background-color: #003366; 
+      padding: 20px 0; 
+    }
+
+    .navbar-brand-custom {
+      color: #fff;
+      font-weight: bold;
+      font-size: 1.8rem; 
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar navbar-expand-lg navbar-dark navbar-custom">
+    <div class="container">
+      <!-- Centered brand -->
+      <a class="navbar-brand navbar-brand-custom mx-auto" href="index1.html">Campus Control</a>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+
+    
+    
+    
+    <!-- Form to add/update a student -->
+    <form id="studentForm" class="bg-white p-4 rounded shadow-sm mb-4">
+      <div class="form-group">
+        <label for="rollNo">Roll No:</label>
+        <input type="text" class="form-control" id="rollNo" name="rollNo" required>
+      </div>
+      <div class="form-group">
+        <label for="name">Name:</label>
+        <input type="text" class="form-control" id="name" name="name" required>
+      </div>
+      <div class="form-group">
+        <label for="studentClass">Class:</label>
+        <input type="text" class="form-control" id="studentClass" name="studentClass" required>
+      </div>
+      <div class="form-group">
+        <label for="section">Section:</label>
+        <input type="text" class="form-control" id="section" name="section" required>
+      </div>
+      <div class="form-group">
+        <label for="contactNo">Contact No:</label>
+        <input type="text" class="form-control" id="contactNo" name="contactNo" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Add/Update Student</button>
+      <div id="errorMessage" class="text-center text-danger mt-2"></div>
+    </form>
+    
+    <!-- Search bar -->
+    <div class="input-group mb-4">
+      <input type="text" class="form-control" id="searchQuery" placeholder="Search...">
+      <div class="input-group-append">
+        <button class="btn btn-primary" type="button" onclick="searchStudents()">Search</button>
+      </div>
+    </div>
+
+    <!-- Table to display student information -->
+    <table class="table table-bordered">
+      <thead class="thead-light">
+        <tr>
+          <th>Roll No</th>
+          <th>Name</th>
+          <th>Class</th>
+          <th>Section</th>
+          <th>Contact No</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="studentList">
+        <!-- Student rows will be inserted here dynamically -->
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Bootstrap JS and dependencies -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@1.16.1/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const studentForm = document.getElementById('studentForm');
+      const studentList = document.getElementById('studentList');
+      const errorMessage = document.getElementById('errorMessage');
+      const searchQuery = document.getElementById('searchQuery');
+      let isEditing = false;
+      let currentRollNo = null;
+
+      // Function to fetch and display student data
+      const fetchStudents = async () => {
+        try {
+          const response = await fetch('http://localhost:3000/students');
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          const students = await response.json();
+          displayStudents(students);
+        } catch (error) {
+          errorMessage.textContent = 'Failed to fetch students. Please try again later.';
+        }
+      };
+
+      // Function to display students in the table
+      const displayStudents = (data) => {
+        studentList.innerHTML = ''; // Clear previous student list
+        const students = data.data;
+
+        students.sort((a, b) => a.rollNo - b.rollNo);
+
+        students.forEach(student => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${student.rollNo}</td>
+            <td>${student.name}</td>
+            <td>${student.studentClass}</td>
+            <td>${student.section}</td>
+            <td>${student.contactNo}</td>
+            <td>
+              <button class="btn btn-info btn-sm" onclick="editStudent('${student.rollNo}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteStudent('${student.rollNo}')">Delete</button>
+            </td>
+          `;
+          studentList.appendChild(row);
+        });
+      };
+
+      // Event listener for form submission (add/update student)
+      studentForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        errorMessage.textContent = ''; // Clear any previous error messages
+        const formData = new FormData(studentForm);
+        const studentData = Object.fromEntries(formData);
+
+        try {
+          let response;
+          if (isEditing) {
+            response = await fetch(`http://localhost:3000/students/${currentRollNo}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(studentData)
+            });
+          } else {
+            response = await fetch('http://localhost:3000/students', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(studentData)
+            });
+          }
+          const responseData = await response.json();
+          if (!response.ok) {
+            throw new Error(responseData.error);
+          }
+          alert(responseData.message);
+          studentForm.reset();
+          fetchStudents(); // Refresh student list after adding/updating a student
+          isEditing = false;
+          currentRollNo = null;
+        } catch (error) {
+          errorMessage.textContent = error.message;
+        }
+      });
+
+      // Function to delete a student
+      window.deleteStudent = async (rollNo) => {
+        try {
+          const response = await fetch(`http://localhost:3000/students/${rollNo}`, {
+            method: 'DELETE'
+          });
+          const responseData = await response.json();
+          if (!response.ok) {
+            throw new Error(responseData.error);
+          }
+          alert(responseData.message);
+          fetchStudents(); // Refresh student list after deletion
+        } catch (error) {
+          errorMessage.textContent = error.message;
+        }
+      };
+
+      // Function to edit a student
+      window.editStudent = (rollNo) => {
+        const student = Array.from(studentList.children).find(row => row.children[0].textContent === rollNo);
+        if (student) {
+          document.getElementById('rollNo').value = student.children[0].textContent;
+          document.getElementById('name').value = student.children[1].textContent;
+          document.getElementById('studentClass').value = student.children[2].textContent;
+          document.getElementById('section').value = student.children[3].textContent;
+          document.getElementById('contactNo').value = student.children[4].textContent;
+          isEditing = true;
+          currentRollNo = rollNo;
+        }
+      };
+
+      // Function to search students
+      window.searchStudents = async () => {
+        try {
+          const query = searchQuery.value.trim();
+          if (!query) {
+            fetchStudents();
+            return;
+          }
+          const response = await fetch(`http://localhost:3000/students/search/${query}`);
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          const students = await response.json();
+          displayStudents(students);
+        } catch (error) {
+          errorMessage.textContent = 'Failed to search students. Please try again later.';
+        }
+      };
+
+      // Fetch and display students on page load
+      fetchStudents();
+    });
+  </script>
+</body>
+</html>
